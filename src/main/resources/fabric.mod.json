@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "native-squidnames",
+  "version": "${version}",
+  "name": "Native Squidnames",
+  "description": "",
+  "authors": [],
+  "contact": {},
+  "license": "All-Rights-Reserved",
+  "icon": "assets/native-squidnames/icon.png",
+  "environment": "server",
+  "entrypoints": {
+    "main": [
+      "org.orsa.nativeSquidnames.NativeSquidnames"
+    ]
+  },
+  "mixins": [
+    "native-squidnames.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric-api": "*",
+    "minecraft": "${minecraft_version}"
+  }
+}

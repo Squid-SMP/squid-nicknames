@@ -1,0 +1,19 @@
+{
+  "required": true,
+  "package": "org.orsa.nativeSquidnames.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "minVersion": "0.8",
+  "mixinextras": {
+    "minVersion": "0.5.0"
+  },
+  "mixins": [
+    "ServerLoginNetworkHandlerMixin",
+    "PlayerEntityMixin",
+    "PlayerManagerMixin"
+  ],
+  "server": [
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
