@@ -36,7 +36,7 @@ import static net.minecraft.server.command.CommandManager.argument;
 import static net.minecraft.server.command.CommandManager.literal;
 
 public class NativeSquidnames implements ModInitializer {
-    public static final String MOD_ID = "native-nicknames";
+    public static final String MOD_ID = "native-squidnames";
     public static final Logger LOGGER = LogManager.getLogger(MOD_ID);
     public static final Type GSON_TYPE = new TypeToken<Map<UUID, String>>() {}.getType();
 
@@ -53,7 +53,6 @@ public class NativeSquidnames implements ModInitializer {
     public void onInitialize() {
         CONFIG_FILE = FabricLoader.getInstance().getConfigDir().resolve(MOD_ID + ".json").toFile();
         loadConfig();
-        LOGGER.info(MOD_ID + " initialized.");
 
         CommandRegistrationCallback.EVENT.register((cd, ra, re) -> registerCommands(cd));
         ServerLifecycleEvents.SERVER_STARTED.register(server -> SERVER = server);
