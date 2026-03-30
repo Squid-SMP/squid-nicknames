@@ -23,6 +23,7 @@ import net.minecraft.text.Text;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.orsa.nativeSquidnames.mixin.PlayerEntityMixin;
+import org.orsa.nativeSquidnames.util.MojangApi;
 
 import java.io.File;
 import java.io.FileReader;
@@ -78,9 +79,14 @@ public class NativeSquidnames implements ModInitializer {
             literal("nick")
                 .then(literal("other")
                 .then(argument("player", StringArgumentType.word())
-                .then(argument("nickname", StringArgumentType.word())
-                    .executes(NativeSquidnames::nickOtherCommand)
-                )))
+                    .then(literal("set")
+                        .then(argument("nickname", StringArgumentType.word())
+                            .executes(NativeSquidnames::nickOtherCommand)
+                        ))
+                    .then(literal("clear")
+                        .executes(NativeSquidnames::nickOtherClearCommand)
+                    )
+                ))
             );
     }
 
@@ -107,6 +113,13 @@ public class NativeSquidnames implements ModInitializer {
         return trySetOtherNickname(playerName, nick, source);
     }
 
+    private static int nickOtherClearCommand(CommandContext<ServerCommandSource> context) {
+        var source = context.getSource();
+        var playerName = StringArgumentType.getString(context, "player");
+
+        return tryClearOtherNickname(playerName, source);
+    }
+
     public static int trySetSelfNickname(ServerPlayerEntity player, String nick, ServerCommandSource source) {
         if (player == null) {
             source.sendError(Text.literal("This command can only be run as a player."));
@@ -123,14 +136,16 @@ public class NativeSquidnames implements ModInitializer {
             return 0;
         }
 
-        mapping.remove(player.getUuid());
+        mapping.put(player.getUuid(), "");
 
-        source.sendMessage(Text.literal("Nick cleared. To apply changes, please disconnect & reconnect to this server."));
+        saveConfig();
+
+        player.networkHandler.disconnect(Text.literal("Your nickname has been cleared. Reconnect to see the changes."));
         return 1;
     }
 
     public static int trySetOtherNickname(String playerName, String nick, ServerCommandSource source) {
-        var uuid = getOfflinePlayerUUID(playerName);
+        var uuid = MojangApi.getPlayerUUID(playerName);
 
         if (uuid == null) {
             source.sendError(Text.literal("Player not found."));
@@ -144,6 +159,36 @@ public class NativeSquidnames implements ModInitializer {
         }
 
         return result;
+    }
+
+    public static int tryClearOtherNickname(String playerName, ServerCommandSource source) {
+        var uuid = MojangApi.getPlayerUUID(playerName);
+
+        if (uuid == null) {
+            source.sendError(Text.literal("Player not found."));
+            return 0;
+        }
+
+        source.sendMessage(Text.literal("Nick of " + uuid + " cleared."));
+
+        tryClearPlayerNickname(uuid);
+
+        return 1;
+    }
+
+    public static void tryClearPlayerNickname(UUID uuid) {
+        mapping.put(uuid, "");
+
+        saveConfig();
+
+        var player = SERVER.getPlayerManager().getPlayer(uuid);
+
+        if (player == null) {
+            return;
+        }
+
+        player.networkHandler.disconnect(Text.literal("Your nickname has been cleared. Reconnect to see the changes."));
+
     }
 
     public static int trySetPlayerNickname(UUID uuid, String nick) {
@@ -243,21 +288,6 @@ public class NativeSquidnames implements ModInitializer {
             }
         } catch (Exception e) {
             LOGGER.error("Failed to read config.", e);
-        }
-    }
-
-    public static UUID getOfflinePlayerUUID(String name) {
-        try {
-            URL url = new URL("https://api.mojang.com/users/profiles/minecraft/" + name);
-            InputStreamReader reader = new InputStreamReader(url.openStream());
-            JsonObject obj = JsonParser.parseReader(reader).getAsJsonObject();
-            String id = obj.get("id").getAsString();
-            return UUID.fromString(id.replaceFirst(
-                    "(\\w{8})(\\w{4})(\\w{4})(\\w{4})(\\w{12})",
-                    "$1-$2-$3-$4-$5"
-            ));
-        } catch (Exception e) {
-            return null;
         }
     }
 }

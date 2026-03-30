@@ -25,7 +25,7 @@ public class ServerLoginNetworkHandlerMixin {
         var profile = original.call(instance);
         UUID id = profile.id();
 
-        if (!NativeSquidnames.mapping.containsKey(id)) {
+        if (!NativeSquidnames.mapping.containsKey(id) || NativeSquidnames.mapping.get(id).isEmpty()) {
             return profile;
         }
 
