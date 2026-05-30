@@ -12,14 +12,12 @@ import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.network.packet.s2c.play.EntitySpawnS2CPacket;
-import net.minecraft.network.packet.s2c.play.PlayerListS2CPacket;
-import net.minecraft.network.packet.s2c.play.PlayerRemoveS2CPacket;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
+import net.minecraft.network.protocol.game.ClientboundPlayerInfoRemovePacket;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.text.Text;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.network.chat.Component;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.orsa.nativeSquidnames.mixin.PlayerEntityMixin;
@@ -33,8 +31,8 @@ import java.lang.reflect.Type;
 import java.net.URL;
 import java.util.*;
 
-import static net.minecraft.server.command.CommandManager.argument;
-import static net.minecraft.server.command.CommandManager.literal;
+import static net.minecraft.commands.Commands.argument;
+import static net.minecraft.commands.Commands.literal;
 
 public class NativeSquidnames implements ModInitializer {
     public static final String MOD_ID = "native-squidnames";
@@ -59,7 +57,7 @@ public class NativeSquidnames implements ModInitializer {
         ServerLifecycleEvents.SERVER_STARTED.register(server -> SERVER = server);
     }
 
-    public static void registerCommands(CommandDispatcher<ServerCommandSource> dispatcher) {
+    public static void registerCommands(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(
             literal("nick")
                 .then(literal("set")
@@ -90,7 +88,7 @@ public class NativeSquidnames implements ModInitializer {
             );
     }
 
-    private static int nickSetCommand(CommandContext<ServerCommandSource> context) {
+    private static int nickSetCommand(CommandContext<CommandSourceStack> context) {
         var source = context.getSource();
         var player = source.getPlayer();
         var nick = StringArgumentType.getString(context, "nickname");
@@ -98,14 +96,14 @@ public class NativeSquidnames implements ModInitializer {
         return trySetSelfNickname(player, nick, source);
     }
 
-    private static int nickClearCommand(CommandContext<ServerCommandSource> context) {
+    private static int nickClearCommand(CommandContext<CommandSourceStack> context) {
         var source = context.getSource();
         var player = source.getPlayer();
 
         return tryClearNickname(player, source);
     }
 
-    private static int nickOtherCommand(CommandContext<ServerCommandSource> context) {
+    private static int nickOtherCommand(CommandContext<CommandSourceStack> context) {
         var source = context.getSource();
         var playerName = StringArgumentType.getString(context, "player");
         var nick = StringArgumentType.getString(context, "nickname");
@@ -113,63 +111,63 @@ public class NativeSquidnames implements ModInitializer {
         return trySetOtherNickname(playerName, nick, source);
     }
 
-    private static int nickOtherClearCommand(CommandContext<ServerCommandSource> context) {
+    private static int nickOtherClearCommand(CommandContext<CommandSourceStack> context) {
         var source = context.getSource();
         var playerName = StringArgumentType.getString(context, "player");
 
         return tryClearOtherNickname(playerName, source);
     }
 
-    public static int trySetSelfNickname(ServerPlayerEntity player, String nick, ServerCommandSource source) {
+    public static int trySetSelfNickname(ServerPlayer player, String nick, CommandSourceStack source) {
         if (player == null) {
-            source.sendError(Text.literal("This command can only be run as a player."));
+            source.sendFailure(Component.literal("This command can only be run as a player."));
             return 0;
         }
 
-        var uuid = player.getUuid();
+        var uuid = player.getUUID();
         return trySetPlayerNickname(uuid, nick, source);
     }
 
-    public static int tryClearNickname(ServerPlayerEntity player, ServerCommandSource source) {
+    public static int tryClearNickname(ServerPlayer player, CommandSourceStack source) {
         if (player == null) {
-            source.sendError(Text.literal("This command can only be run as a player."));
+            source.sendFailure(Component.literal("This command can only be run as a player."));
             return 0;
         }
 
-        mapping.put(player.getUuid(), "");
+        mapping.put(player.getUUID(), "");
 
         saveConfig();
 
-        player.networkHandler.disconnect(Text.literal("Your nickname has been cleared. Reconnect to see the changes."));
+        player.connection.disconnect(Component.literal("Your nickname has been cleared. Reconnect to see the changes."));
         return 1;
     }
 
-    public static int trySetOtherNickname(String playerName, String nick, ServerCommandSource source) {
+    public static int trySetOtherNickname(String playerName, String nick, CommandSourceStack source) {
         var uuid = MojangApi.getPlayerUUID(playerName);
 
         if (uuid == null) {
-            source.sendError(Text.literal("Player not found."));
+            source.sendFailure(Component.literal("Player not found."));
             return 0;
         }
 
         var result = trySetPlayerNickname(uuid, nick, source);
 
         if (result == 1) {
-            source.sendMessage(Text.literal("Nick of " + uuid + " set to " + nick + "."));
+            source.sendSystemMessage(Component.literal("Nick of " + uuid + " set to " + nick + "."));
         }
 
         return result;
     }
 
-    public static int tryClearOtherNickname(String playerName, ServerCommandSource source) {
+    public static int tryClearOtherNickname(String playerName, CommandSourceStack source) {
         var uuid = MojangApi.getPlayerUUID(playerName);
 
         if (uuid == null) {
-            source.sendError(Text.literal("Player not found."));
+            source.sendFailure(Component.literal("Player not found."));
             return 0;
         }
 
-        source.sendMessage(Text.literal("Nick of " + uuid + " cleared."));
+        source.sendSystemMessage(Component.literal("Nick of " + uuid + " cleared."));
 
         tryClearPlayerNickname(uuid);
 
@@ -181,24 +179,23 @@ public class NativeSquidnames implements ModInitializer {
 
         saveConfig();
 
-        var player = SERVER.getPlayerManager().getPlayer(uuid);
+        var player = SERVER.getPlayerList().getPlayer(uuid);
 
         if (player == null) {
             return;
         }
 
-        player.networkHandler.disconnect(Text.literal("Your nickname has been cleared. Reconnect to see the changes."));
-
+        player.connection.disconnect(Component.literal("Your nickname has been cleared. Reconnect to see the changes."));
     }
 
     public static int trySetPlayerNickname(UUID uuid, String nick) {
         return trySetPlayerNickname(uuid, nick, null);
     }
 
-    public static int trySetPlayerNickname(UUID uuid, String nick, ServerCommandSource source) {
+    public static int trySetPlayerNickname(UUID uuid, String nick, CommandSourceStack source) {
         if (!nick.matches(USERNAME_REGEX)) {
             if (source != null) {
-                source.sendError(Text.literal("Nickname contains invalid characters or is longer than 16 characters. Please choose a different one."));
+                source.sendFailure(Component.literal("Nickname contains invalid characters or is longer than 16 characters. Please choose a different one."));
             }
 
             return 0;
@@ -206,7 +203,7 @@ public class NativeSquidnames implements ModInitializer {
 
         if (mapping.containsValue(nick) && !nick.equals(mapping.get(uuid))) {
             if (source != null) {
-                source.sendError(Text.literal("Someone already has that nickname. Please choose a different one."));
+                source.sendFailure(Component.literal("Someone already has that nickname. Please choose a different one."));
             }
 
             return 0;
@@ -216,13 +213,13 @@ public class NativeSquidnames implements ModInitializer {
 
         saveConfig();
 
-        var player = SERVER.getPlayerManager().getPlayer(uuid);
+        var player = SERVER.getPlayerList().getPlayer(uuid);
 
         if (player == null) {
             return 1;
         }
 
-        player.networkHandler.disconnect(Text.literal("Your nickname has been set to \"" + nick + "\". Reconnect to see the changes."));
+        player.connection.disconnect(Component.literal("Your nickname has been set to \"" + nick + "\". Reconnect to see the changes."));
 
         return 1;
     }
@@ -230,7 +227,7 @@ public class NativeSquidnames implements ModInitializer {
     // --- UPDATE NAME EVERYWHERE ---
 
     private static void replacePlayerGameProfile(UUID uuid, String nick) {
-        var player = SERVER.getPlayerManager().getPlayer(uuid);
+        var player = SERVER.getPlayerList().getPlayer(uuid);
 
         if (player == null) {
             return;
@@ -244,14 +241,14 @@ public class NativeSquidnames implements ModInitializer {
         simulateDcRc(player);
     }
 
-    private static void simulateDcRc(ServerPlayerEntity player) {
-        var playerManager = SERVER.getPlayerManager();
-        var uuid = player.getUuid();
+    private static void simulateDcRc(ServerPlayer player) {
+        var playerList = SERVER.getPlayerList();
+        var uuid = player.getUUID();
 
-        for (ServerPlayerEntity otherPlayer : playerManager.getPlayerList()) {
+        for (ServerPlayer otherPlayer : playerList.getPlayers()) {
             if (otherPlayer == player) continue;
-            otherPlayer.networkHandler.sendPacket(new PlayerRemoveS2CPacket(List.of(uuid)));
-            otherPlayer.networkHandler.sendPacket(new EntitySpawnS2CPacket(player, 0, player.getBlockPos()));
+            otherPlayer.connection.send(new ClientboundPlayerInfoRemovePacket(List.of(uuid)));
+            otherPlayer.connection.send(new ClientboundAddEntityPacket(player, 0, player.blockPosition()));
         }
     }
 

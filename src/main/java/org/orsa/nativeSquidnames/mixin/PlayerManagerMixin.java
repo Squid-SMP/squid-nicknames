@@ -3,8 +3,8 @@ package org.orsa.nativeSquidnames.mixin;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
-import net.minecraft.server.PlayerManager;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.players.PlayerList;
 import org.slf4j.Logger;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -14,18 +14,18 @@ import org.spongepowered.asm.mixin.injection.At;
 import static org.orsa.nativeSquidnames.NativeSquidnames.LOGGER;
 import static org.orsa.nativeSquidnames.NativeSquidnames.mapping;
 
-@Mixin(PlayerManager.class)
+@Mixin(PlayerList.class)
 public abstract class PlayerManagerMixin {
 
     @WrapOperation(
-            method = "onPlayerConnect",
+            method = "placeNewPlayer",
             at = @At(
                     value = "INVOKE",
                     target = "Ljava/lang/String;equalsIgnoreCase(Ljava/lang/String;)Z"
             )
     )
-    private boolean wrapNameChangedCheck(String a, String b, Operation<Boolean> original, @Local(argsOnly = true) ServerPlayerEntity player) {
-        if (mapping.containsKey(player.getUuid())) {
+    private boolean wrapNameChangedCheck(String a, String b, Operation<Boolean> original, @Local(argsOnly = true) ServerPlayer player) {
+        if (mapping.containsKey(player.getUUID())) {
             return true;
         }
 
