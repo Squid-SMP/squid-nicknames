@@ -135,7 +135,6 @@ local.properties
 
 #Gradle
 .gradle/
-gradle.properties
 
 # Exceptions
 !gradle/wrapper/*.jar
