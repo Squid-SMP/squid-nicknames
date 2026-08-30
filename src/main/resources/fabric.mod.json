@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "id": "native-squidnames",
+  "id": "squid-nicknames",
   "version": "${version}",
-  "name": "Native Squidnames",
+  "name": "Squid Nicknames",
   "description": "",
   "authors": [],
   "contact": {},
@@ -15,7 +15,7 @@
     ]
   },
   "mixins": [
-    "native-squidnames.mixins.json"
+    "squid-nicknames.mixins.json"
   ],
   "depends": {
     "fabricloader": ">=${loader_version}",
